@@ -83,22 +83,17 @@ services:
         condition: service_healthy
       redis-node-3:
         condition: service_healthy
-    command: >
-      bash -c "
-      if redis-cli -h redis-node-1 -p 7001 CLUSTER INFO | grep -q 'cluster_state:ok'; then
-        echo 'Cluster already initialized, skipping creation';
-      else
-        echo 'Initializing Redis cluster...';
-        redis-cli --cluster create
-        redis-node-1:7001
-        redis-node-2:7002
-        redis-node-3:7003
-        --cluster-replicas 0
-        --cluster-yes;
-      fi &&
-      echo 'Init container running, cluster is ready' &&
-      tail -f /dev/null
-      "
+    command: |
+      bash -c '
+        if redis-cli -h redis-node-1 -p 7001 CLUSTER INFO | grep -q "cluster_state:ok"; then
+          echo "Cluster already initialized, skipping creation"
+        else
+          echo "Initializing Redis cluster..."
+          redis-cli --cluster create redis-node-1:7001 redis-node-2:7002 redis-node-3:7003 --cluster-replicas 0 --cluster-yes
+        fi
+        echo "Init container running, cluster is ready"
+        tail -f /dev/null
+      '
     x-ddev:
       describe-url-port: |
         Backend: ${REDIS_DOCKER_IMAGE:-redis:7} (3-node cluster)

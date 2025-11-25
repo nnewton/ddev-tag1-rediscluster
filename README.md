@@ -1,8 +1,3 @@
-[![add-on registry](https://img.shields.io/badge/DDEV-Add--on_Registry-blue)](https://addons.ddev.com)
-[![tests](https://github.com/ddev/ddev-redis/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddev/ddev-redis/actions/workflows/tests.yml?query=branch%3Amain)
-[![last commit](https://img.shields.io/github/last-commit/ddev/ddev-redis)](https://github.com/ddev/ddev-redis/commits)
-[![release](https://img.shields.io/github/v/release/ddev/ddev-redis)](https://github.com/ddev/ddev-redis/releases/latest)
-
 ## DDEV Redis Cluster with Envoy Proxy
 
 ## Overview
@@ -155,5 +150,3 @@ ddev restart
 **Redis cluster implementation by Tag1 Consulting**
 
 **Original DDEV Redis add-on contributed by [@hussainweb](https://github.com/hussainweb)**
-
-**Maintained by the [DDEV team](https://ddev.com/support-ddev/)**
