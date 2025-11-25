@@ -5,8 +5,8 @@ use Drupal\Core\Installer\InstallerKernel;
 if (!InstallerKernel::installationAttempted() && extension_loaded('redis') && class_exists('Drupal\redis\ClientFactory')) {
   // Set Redis as the default backend for any cache bin not otherwise specified.
   $settings['cache']['default'] = 'cache.backend.redis';
-  $settings['redis.connection']['host'] = 'redis';
-  $settings['redis.connection']['port'] = 6379;
+  $settings['redis.connection']['host'] = 'envoy';
+  $settings['redis.connection']['port'] = 10000;
 
   // Apply changes to the container configuration to better leverage Redis.
   // This includes using Redis for the lock and flood control systems, as well

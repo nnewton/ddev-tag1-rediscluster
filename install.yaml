@@ -1,22 +1,14 @@
-name: redis
+name: tag1-redis-cluster
 
 project_files:
   - docker-compose.redis.yaml
+  - docker-compose.envoy.yaml
   - redis/scripts/settings.ddev.redis.php
   - redis/scripts/setup-drupal-settings.sh
-  - redis/scripts/setup-redis-optimized-config.sh
   - redis/redis.conf
-  - redis/advanced.conf
-  - redis/append.conf
-  - redis/general.conf
-  - redis/io.conf
-  - redis/memory.conf
-  - redis/network.conf
-  - redis/security.conf
-  - redis/snapshots.conf
-  - commands/host/redis-backend
-  - commands/redis/redis-cli
-  - commands/redis/redis-flush
+  - redis/redis-cluster.conf
+  - commands/redis-node-1/redis-cli
+  - commands/redis-node-1/redis-flush
 
 ddev_version_constraint: '>= v1.24.10'
 
@@ -24,9 +16,6 @@ post_install_actions:
   - |
     #ddev-description:Install redis settings for Drupal 9+ if applicable
     redis/scripts/setup-drupal-settings.sh
-  - |
-    #ddev-description:Using optimized config if --redis-optimized=true
-    redis/scripts/setup-redis-optimized-config.sh
   - |
     #ddev-description:Remove redis/scripts if there are no files
     rmdir redis/scripts 2>/dev/null || true

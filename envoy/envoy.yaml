@@ -1,0 +1,59 @@
+admin:
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 9901
+static_resources:
+  listeners:
+  - name: redis_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+      - filters:
+          - name: envoy.filters.network.redis_proxy
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+              stat_prefix: redis_stats
+              # Important: for Redis Cluster, enable_redirection must be true
+              settings:
+                op_timeout: 5s
+                enable_redirection: true
+                dns_cache_config:
+                  name: dns_cache_for_redis
+                  dns_lookup_family: V4_ONLY
+                  max_hosts: 100
+              prefix_routes:
+                # For any key (the catch-all route), send traffic to our cluster
+                catch_all_route:
+                  cluster: redis-cluster
+
+  clusters:
+  - name: redis-cluster
+    connect_timeout: 1s
+    lb_policy: CLUSTER_PROVIDED
+    typed_extension_protocol_options:
+      envoy.filters.network.redis_proxy:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+    load_assignment:
+      cluster_name: redis-cluster
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: redis-node-1
+                    port_value: 7001
+    # Use the Redis cluster discovery extension to treat this as a Redis Cluster
+    cluster_type:
+      name: envoy.clusters.redis
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+        cluster_refresh_rate: 5s
+        cluster_refresh_timeout: 4s
+    outlier_detection:
+      consecutive_5xx: 5  # Eject a host after 5 consecutive 5xx errors
+      interval: 10s       # Time interval between ejection checks
+      base_ejection_time: 30s  # Initial duration to eject a host for
+      max_ejection_percent: 20 # Maximum percent of hosts that can be ejected

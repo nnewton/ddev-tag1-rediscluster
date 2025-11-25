@@ -1,0 +1,24 @@
+#ddev-generated
+services:
+  envoy:
+    container_name: ddev-${DDEV_SITENAME}-envoy
+    image: ${ENVOY_DOCKER_IMAGE:-envoyproxy/envoy:v1.28-latest}
+    hostname: ${ENVOY_HOSTNAME:-envoy}
+    # These labels ensure this service is discoverable by ddev.
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    restart: "no"
+    expose:
+      - 9901
+      - 10000
+    volumes:
+      - ".:/mnt/ddev_config"
+      - "ddev-global-cache:/mnt/ddev-global-cache"
+      - "./envoy:/etc/envoy"
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
+    x-ddev:
+      describe-url-port: |
+        Backend: ${ENVOY_DOCKER_IMAGE:-envoyproxy/envoy:v1.28-latest}
+      describe-info: |
+        Admin UI: port 9901, Proxy: port 10000

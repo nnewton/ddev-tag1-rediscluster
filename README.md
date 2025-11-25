@@ -3,16 +3,23 @@
 [![last commit](https://img.shields.io/github/last-commit/ddev/ddev-redis)](https://github.com/ddev/ddev-redis/commits)
 [![release](https://img.shields.io/github/v/release/ddev/ddev-redis)](https://github.com/ddev/ddev-redis/releases/latest)
 
-## DDEV Redis
-
-> [!NOTE]
-> This add-on has absorbed functionality from `ddev/ddev-redis-7`, see [Advanced Customization](#advanced-customization).
+## DDEV Redis Cluster with Envoy Proxy
 
 ## Overview
 
 [Redis](https://redis.io/) is an in-memory key–value database, used as a distributed cache and message broker, with optional durability.
 
-This add-on integrates Redis into your [DDEV](https://ddev.com/) project with Redis persistence enabled by default.
+This add-on integrates a **3-node Redis Cluster** into your [DDEV](https://ddev.com/) project with an **Envoy proxy** frontend for load balancing and connection pooling. The cluster provides high availability and horizontal scaling capabilities, with Redis persistence enabled by default.
+
+### Architecture
+
+- **3 Redis nodes** running in cluster mode (no replicas)
+  - `redis-node-1:7001`
+  - `redis-node-2:7002`
+  - `redis-node-3:7003`
+- **Envoy proxy** frontend for connection pooling and load balancing
+  - Proxy endpoint: `envoy:10000`
+  - Admin UI: `envoy:9901`
 
 ## Installation
 
@@ -27,99 +34,126 @@ After installation, make sure to commit the `.ddev` directory to version control
 
 | Command | Description |
 | ------- | ----------- |
-| `ddev redis-backend` | Use a different key-value store for Redis |
-| `ddev redis-cli` | Run `redis-cli` inside the Redis container |
+| `ddev redis-cli` | Run `redis-cli` inside the Redis cluster (connects to node-1 with cluster mode) |
 | `ddev redis` | Alias for `ddev redis-cli` |
-| `ddev redis-flush` | Flush all cache inside the Redis container |
-| `ddev describe` | View service status and used ports for Redis |
-| `ddev logs -s redis` | Check Redis logs |
+| `ddev redis-flush` | Flush all cache inside the Redis cluster (flushes all 3 nodes) |
+| `ddev describe` | View service status and used ports for Redis cluster and Envoy |
+| `ddev logs -s redis-node-1` | Check Redis node 1 logs |
+| `ddev logs -s redis-node-2` | Check Redis node 2 logs |
+| `ddev logs -s redis-node-3` | Check Redis node 3 logs |
+| `ddev logs -s envoy` | Check Envoy proxy logs |
 
-Redis is available inside Docker containers with `redis:6379`.
+### Connection Information
 
-## What makes the optimized config different?
+Applications should connect to Redis via the **Envoy proxy** for load balancing:
 
-The default config only uses the [redis.conf](./redis/redis.conf) file.
+**Recommended (via Envoy proxy):**
+- Host: `envoy`
+- Port: `10000`
 
-The optimized config uses all `*.conf` files in the [redis](./redis) directory except `redis.conf`.
+**Direct node access** (for cluster management or debugging):
+- Node 1: `redis-node-1:7001`
+- Node 2: `redis-node-2:7002`
+- Node 3: `redis-node-3:7003`
 
-It uses *hardened* settings ready for production, like enabling Redis credentials.
+**Envoy admin interface:**
+- URL: `http://envoy:9901`
 
-You can read each config file to see the exact differences.
+## Redis Cluster Management
+
+Check cluster status:
+
+```bash
+ddev redis-cli CLUSTER INFO
+```
+
+View cluster nodes:
+
+```bash
+ddev redis-cli CLUSTER NODES
+```
+
+Get cluster slots distribution:
+
+```bash
+ddev redis-cli CLUSTER SLOTS
+```
 
 ## Redis Credentials
 
-By default, there is no authentication.
+By default, there is no authentication. The cluster runs with `protected-mode no` to allow inter-node communication.
 
-If you have the optimized config enabled, the credentials are:
-
-| Field    | Value   |
-|----------|---------|
-| Username | `redis` |
-| Password | `redis` |
+> [!WARNING]
+> For production deployments, you should enable Redis authentication by configuring ACLs in the cluster configuration.
 
 For more information about ACLs, see the [Redis documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/).
 
-### Swappable Redis backends
+## Configuration Files
 
-Use the `ddev redis-backend` command to swap between Redis backends:
+- `redis/redis.conf` - Standard Redis configuration (for reference, not used by cluster)
+- `redis/redis-cluster.conf` - Cluster-specific configuration used by all nodes
+- `docker-compose.redis.yaml` - Redis cluster service definitions
+- `docker-compose.envoy.yaml` - Envoy proxy service definition
+- `envoy/envoy.yaml` - Envoy proxy configuration (to be created)
 
-| Command | Docker Image |
-|--------------------------------------|-----------------------------------------------|
-| `ddev redis-backend redis`           | `redis:7`                                     |
-| `ddev redis-backend redis-alpine`    | `redis:7-alpine`                              |
-| `ddev redis-backend valkey`          | `valkey/valkey:8`                             |
-| `ddev redis-backend valkey-alpine`   | `valkey/valkey:8-alpine`                      |
-| `ddev redis-backend <image>`         | `<image>` (specify your custom Redis image)   |
+## Customization
 
-> [!TIP]
-> Add `optimize` or `optimized` after the command to enable optimized Redis configuration.
->
-> Example: `ddev redis-backend redis optimize`
-
-## Advanced Customization
-
-To apply an optimized configuration from `ddev/ddev-redis-7`:
+To change the Redis Docker image used for all cluster nodes:
 
 ```bash
-ddev dotenv set .ddev/.env.redis --redis-optimized=true
-ddev add-on get ddev/ddev-redis
+ddev dotenv set .ddev/.env.redis --redis-docker-image=redis:7-alpine
+ddev restart
+```
 
-# (optional) if you have an existing Redis volume, delete it to avoid problems with Redis:
-ddev stop
-docker volume rm ddev-$(ddev status -j | docker run -i --rm ddev/ddev-utilities jq -r '.raw.name')_redis
+To change the Envoy Docker image:
 
+```bash
+ddev dotenv set .ddev/.env.redis --envoy-docker-image=envoyproxy/envoy:v1.28-latest
+ddev restart
+```
+
+To change the Envoy hostname:
+
+```bash
+ddev dotenv set .ddev/.env.redis --envoy-hostname=envoy
 ddev restart
 ```
 
 Make sure to commit the `.ddev/.env.redis` file to version control.
 
-To change the used Docker image:
-
-```bash
-ddev dotenv set .ddev/.env.redis --redis-docker-image=redis:7
-ddev add-on get ddev/ddev-redis
-
-# (optional) if you have an existing Redis volume, delete it to avoid problems with Redis:
-ddev stop
-docker volume rm ddev-$(ddev status -j | docker run -i --rm ddev/ddev-utilities jq -r '.raw.name')_redis
-
-ddev restart
-```
-
-Make sure to commit the `.ddev/.env.redis` file to version control.
-
-All customization options (use with caution):
+### Available Environment Variables
 
 | Variable | Flag | Default |
 | -------- | ---- | ------- |
 | `REDIS_DOCKER_IMAGE` | `--redis-docker-image` | `redis:7` |
-| `REDIS_HOSTNAME` | `--redis-hostname` | `redis` |
-| `REDIS_OPTIMIZED` | `--redis-optimized` | `false` (`true`/`false`) |
+| `ENVOY_DOCKER_IMAGE` | `--envoy-docker-image` | `envoyproxy/envoy:v1.28-latest` |
+| `ENVOY_HOSTNAME` | `--envoy-hostname` | `envoy` |
+
+## Persistence and Data
+
+Each Redis node maintains its own data volume:
+- `redis-node-1` volume
+- `redis-node-2` volume
+- `redis-node-3` volume
+
+The cluster uses append-only file (AOF) persistence by default.
+
+To clear all cluster data:
+
+```bash
+ddev stop
+docker volume rm ddev-$(ddev status -j | docker run -i --rm ddev/ddev-utilities jq -r '.raw.name')_redis-node-1
+docker volume rm ddev-$(ddev status -j | docker run -i --rm ddev/ddev-utilities jq -r '.raw.name')_redis-node-2
+docker volume rm ddev-$(ddev status -j | docker run -i --rm ddev/ddev-utilities jq -r '.raw.name')_redis-node-3
+ddev restart
+```
 
 ## Credits
 
-**Contributed by [@hussainweb](https://github.com/hussainweb) based on the original [ddev-contrib recipe](https://github.com/ddev/ddev-contrib/tree/master/docker-compose-services/redis) by [@gormus](https://github.com/gormus)**
+**Based on the original [ddev-contrib recipe](https://github.com/ddev/ddev-contrib/tree/master/docker-compose-services/redis) by [@gormus](https://github.com/gormus)**
 
-**Optimized config from `ddev/ddev-redis-7` contributed by [@seebeen](https://github.com/seebeen)**
+**Redis cluster implementation by Tag1 Consulting**
+
+**Original DDEV Redis add-on contributed by [@hussainweb](https://github.com/hussainweb)**
 
 **Maintained by the [DDEV team](https://ddev.com/support-ddev/)**

@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+
+#ddev-generated
+## Description: Flush all cache inside the Redis cluster (flushes all nodes)
+## Usage: redis-flush
+## Example: "ddev redis-flush"
+
+# Flush all nodes in the cluster
+for node in redis-node-1:7001 redis-node-2:7002 redis-node-3:7003; do
+  NODE_HOST=$(echo $node | cut -d: -f1)
+  NODE_PORT=$(echo $node | cut -d: -f2)
+
+  if [ -f /etc/redis/conf/security.conf ]; then
+    redis-cli -p $NODE_PORT -h $NODE_HOST -a redis --no-auth-warning FLUSHALL ASYNC
+  else
+    redis-cli -p $NODE_PORT -h $NODE_HOST FLUSHALL ASYNC
+  fi
+done
+
+echo "Flushed all Redis cluster nodes"

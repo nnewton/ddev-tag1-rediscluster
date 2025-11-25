@@ -1,27 +1,112 @@
 #ddev-generated
 services:
-  redis:
-    container_name: ddev-${DDEV_SITENAME}-redis
+  redis-node-1:
+    container_name: ddev-${DDEV_SITENAME}-redis-node-1
     image: ${REDIS_DOCKER_IMAGE:-redis:7}
-    hostname: ${REDIS_HOSTNAME:-redis}
-    # These labels ensure this service is discoverable by ddev.
+    hostname: redis-node-1
     labels:
       com.ddev.site-name: ${DDEV_SITENAME}
       com.ddev.approot: ${DDEV_APPROOT}
     restart: "no"
     expose:
-      - 6379
+      - 7001
+      - 17001
     volumes:
       - ".:/mnt/ddev_config"
       - "ddev-global-cache:/mnt/ddev-global-cache"
       - "./redis:/etc/redis/conf"
-      - "redis:/data"
-    command: /etc/redis/conf/redis.conf
+      - "redis-node-1:/data"
+    command: redis-server /etc/redis/conf/redis-cluster.conf --port 7001 --cluster-announce-ip redis-node-1 --cluster-announce-port 7001 --cluster-announce-bus-port 17001
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7001", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis-node-2:
+    container_name: ddev-${DDEV_SITENAME}-redis-node-2
+    image: ${REDIS_DOCKER_IMAGE:-redis:7}
+    hostname: redis-node-2
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    restart: "no"
+    expose:
+      - 7002
+      - 17002
+    volumes:
+      - ".:/mnt/ddev_config"
+      - "ddev-global-cache:/mnt/ddev-global-cache"
+      - "./redis:/etc/redis/conf"
+      - "redis-node-2:/data"
+    command: redis-server /etc/redis/conf/redis-cluster.conf --port 7002 --cluster-announce-ip redis-node-2 --cluster-announce-port 7002 --cluster-announce-bus-port 17002
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7002", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis-node-3:
+    container_name: ddev-${DDEV_SITENAME}-redis-node-3
+    image: ${REDIS_DOCKER_IMAGE:-redis:7}
+    hostname: redis-node-3
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    restart: "no"
+    expose:
+      - 7003
+      - 17003
+    volumes:
+      - ".:/mnt/ddev_config"
+      - "ddev-global-cache:/mnt/ddev-global-cache"
+      - "./redis:/etc/redis/conf"
+      - "redis-node-3:/data"
+    command: redis-server /etc/redis/conf/redis-cluster.conf --port 7003 --cluster-announce-ip redis-node-3 --cluster-announce-port 7003 --cluster-announce-bus-port 17003
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7003", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis-cluster-init:
+    container_name: ddev-${DDEV_SITENAME}-redis-cluster-init
+    image: ${REDIS_DOCKER_IMAGE:-redis:7}
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    restart: "no"
+    depends_on:
+      redis-node-1:
+        condition: service_healthy
+      redis-node-2:
+        condition: service_healthy
+      redis-node-3:
+        condition: service_healthy
+    command: >
+      bash -c "
+      if redis-cli -h redis-node-1 -p 7001 CLUSTER INFO | grep -q 'cluster_state:ok'; then
+        echo 'Cluster already initialized, skipping creation';
+      else
+        echo 'Initializing Redis cluster...';
+        redis-cli --cluster create
+        redis-node-1:7001
+        redis-node-2:7002
+        redis-node-3:7003
+        --cluster-replicas 0
+        --cluster-yes;
+      fi &&
+      echo 'Init container running, cluster is ready' &&
+      tail -f /dev/null
+      "
     x-ddev:
       describe-url-port: |
-        Backend: ${REDIS_DOCKER_IMAGE:-redis:7}
+        Backend: ${REDIS_DOCKER_IMAGE:-redis:7} (3-node cluster)
       describe-info: |
+        Cluster nodes: redis-node-1:7001, redis-node-2:7002, redis-node-3:7003
         Pass: <none>
 
 volumes:
-  redis:
+  redis-node-1:
+  redis-node-2:
+  redis-node-3:
