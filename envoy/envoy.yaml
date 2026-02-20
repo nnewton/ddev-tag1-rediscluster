@@ -31,7 +31,7 @@ static_resources:
 
   clusters:
   - name: redis-cluster
-    connect_timeout: 1s
+    connect_timeout: 0.5s
     lb_policy: CLUSTER_PROVIDED
     typed_extension_protocol_options:
       envoy.filters.network.redis_proxy:
@@ -45,15 +45,29 @@ static_resources:
                   socket_address:
                     address: redis-node-1
                     port_value: 7001
-    # Use the Redis cluster discovery extension to treat this as a Redis Cluster
     cluster_type:
       name: envoy.clusters.redis
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
         cluster_refresh_rate: 5s
         cluster_refresh_timeout: 4s
+        redirect_refresh_interval: 1s
+        redirect_refresh_threshold: 5
+    health_checks:
+      - timeout: 2s
+        interval: 3s
+        unhealthy_threshold: 3
+        healthy_threshold: 1
+        custom_health_check:
+          name: envoy.health_checkers.redis
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
+            key: envoy-health-check
     outlier_detection:
-      consecutive_5xx: 5  # Eject a host after 5 consecutive 5xx errors
-      interval: 10s       # Time interval between ejection checks
-      base_ejection_time: 30s  # Initial duration to eject a host for
-      max_ejection_percent: 20 # Maximum percent of hosts that can be ejected
+      consecutive_5xx: 3
+      interval: 5s
+      base_ejection_time: 15s
+      max_ejection_percent: 50
+      consecutive_gateway_failure: 3
+      enforcing_consecutive_5xx: 100
+      enforcing_consecutive_gateway_failure: 100
